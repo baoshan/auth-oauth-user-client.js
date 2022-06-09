@@ -6,12 +6,14 @@ const messages = {
   basicAuthIsUnsupported: "Basic authentication is unsupported.",
   codeOrStateMissing: 'Both "code" & "state" parameters are required.',
   stateMismatch: "State mismatch.",
-  unauthorized: "Unauthorized",
+  unauthorized: "Unauthorized.",
+  refreshTokenMissing: "Refresh token missing.",
 };
 
-const errors = Object.entries(messages).reduce((errors, [key, message]) => {
-  errors[key as keyof typeof messages] = new Error(`[${NAME}] ${message}`);
-  return errors;
-}, {} as Record<keyof typeof messages, Error>);
-
-export default errors;
+export const errors = Object.entries(messages).reduce(
+  (errors, [key, message]) => {
+    errors[key as keyof typeof messages] = new Error(`[${NAME}] ${message}`);
+    return errors;
+  },
+  {} as Record<keyof typeof messages, Error>
+);

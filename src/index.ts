@@ -1,68 +1,74 @@
 import { request } from "@octokit/request";
-import { VERSION, userAgent } from "./metadata";
-import { auth } from "./auth";
-import { hook } from "./hook";
 
+//
+import { auth } from "./auth";
 import { createStore } from "./create-store";
-import {
-  ClientType,
-  OAuthApp,
-  GitHubApp,
-  ExpirationType,
-  ExpirationDisabled,
-  ExpirationEnabled,
-  StrategyOptions,
+import { errors } from "./errors";
+import { hook } from "./hook";
+import { userAgent, VERSION } from "./metadata";
+import type {
   AuthInterface,
-  NonGenericState,
-  GenericState,
-  Session,
+  ClientTypes,
+  GenericAuthOptions,
+  GitHubApp,
+  NonGenericAuthOptions,
+  OAuthApp,
+  Auth,
+  StrategyOptions,
+  Scopes,
 } from "./types";
-import errors from "./errors";
 
 // Create an OAuth strategy:
 //
 // 1. `clientType` defaults to `oauth-app`.
 // 2. `expirationEnabled` defaults to `true` for GitHub App.
-export function createOAuthUserClientAuth<
-  Client extends ClientType = OAuthApp,
-  Expiration extends ExpirationType = Client extends GitHubApp
-    ? ExpirationEnabled
-    : ExpirationDisabled
+export const createOAuthUserClientAuth = <
+  ClientType extends ClientTypes = OAuthApp,
+  ExpirationEnabled extends boolean = ClientType extends GitHubApp
+    ? true
+    : false
 >({
-  clientType = "oauth-app" as Client,
-  expirationEnabled = (clientType === "github-app") as Expiration,
+  clientType = "oauth-app" as ClientType,
+  expirationEnabled = (clientType === "github-app") as ExpirationEnabled,
   ...options
-}: StrategyOptions<Client, Expiration>): AuthInterface<Client, Expiration> {
+}: StrategyOptions<ClientType, ExpirationEnabled>): AuthInterface<
+  ClientType,
+  ExpirationEnabled
+> => {
   // Delete me once OAuth App supports token expiration.
-  if (clientType === "oauth-app" && expirationEnabled)
+  if (clientType === "oauth-app" && expirationEnabled) {
     throw errors.oauthAppDoesNotSupportTokenExpiration;
+  }
 
-  const defaultGenericState: GenericState<Client, Expiration> = Object.assign(
-    {
-      clientType,
-      expirationEnabled,
-      sessionStore: createStore<Session<Client, Expiration>>(
-        `AUTH:${options.clientId}`
-      ),
-      session: null,
-    },
-    (clientType === "oauth-app" ? { defaultScopes: [] } : {}) as any
-  );
+  const defaultGenericState = {
+    clientType,
+    expirationEnabled,
+    authStore: createStore<Auth<ClientType, ExpirationEnabled>>(
+      `AUTH:${options.clientId}`
+    ),
+    auth: null,
+    ...(clientType === "oauth-app" ? { defaultScopes: [] as string[] } : {}),
+  } as GenericAuthOptions<ClientType, ExpirationEnabled>;
 
-  const defaultNonGenericState: NonGenericState = {
+  const defaultScopes = (
+    clientType === "oauth-app" ? { defaultScopes: [] as string[] } : {}
+  ) as Scopes<ClientType>;
+
+  const defaultNonGenericState: NonGenericAuthOptions = {
     serviceOrigin: location.origin,
     servicePathPrefix: "/api/github/oauth",
     request: request.defaults({ headers: { "user-agent": userAgent } }),
     stateStore: createStore(`STATE:${options.clientId}`),
   };
 
-  const state = Object.assign(
+  const authOptions = Object.assign(
     defaultGenericState,
+    defaultScopes,
     defaultNonGenericState,
     options
   );
 
-  return Object.assign(auth.bind(state), { hook: hook.bind(state) });
-}
+  return Object.assign(auth(authOptions), { hook: hook(authOptions) });
+};
 
 createOAuthUserClientAuth.VERSION = VERSION;

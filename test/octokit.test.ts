@@ -61,7 +61,7 @@ describe("standalone tests under jsdom environment", () => {
       authStrategy: createOAuthUserClientAuth,
       auth: {
         clientId: "clientId123",
-        session: { authentication: { token: "token123" } },
+        auth: { token: "token123" },
       },
       request: { fetch },
     });
@@ -76,7 +76,7 @@ describe("standalone tests under jsdom environment", () => {
       auth: {
         clientId: "clientId123",
         stateStore: false,
-        sessionStore: false,
+        authStore: false,
       },
     });
 
@@ -108,7 +108,7 @@ describe("standalone tests under jsdom environment", () => {
       authStrategy: createOAuthUserClientAuth,
       auth: {
         clientId: "clientId123",
-        session: { authentication: { token: "token123" } },
+        authentication: { token: "token123" },
       },
       request: {
         fetch: mock,

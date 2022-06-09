@@ -1,7 +1,20 @@
-import * as OctokitTypes from "@octokit/types";
-import * as AuthOAuthUser from "@octokit/auth-oauth-user";
+import type {
+  EndpointOptions,
+  OctokitResponse,
+  RequestInterface,
+  RequestParameters,
+  Route,
+} from "@octokit/types";
+import type {
+  GitHubAppAuthentication,
+  OAuthAppAuthentication,
+} from "@octokit/auth-oauth-user";
 
-// # Types of Generic Parameters
+export type ClientTypes = OAuthApp | GitHubApp;
+export type OAuthApp = "oauth-app";
+export type GitHubApp = "github-app";
+
+// ## Types of Generic Parameters
 
 // Most types and interfaces are generic around two types:
 //
@@ -11,79 +24,81 @@ import * as AuthOAuthUser from "@octokit/auth-oauth-user";
 // Although currently GitHub does not support token expiration for OAuth app,
 // expiring OAuth tokens will become the norm in future. These two concepts are
 // modeled orthogonally.
-export type ClientType = OAuthApp | GitHubApp;
-export type OAuthApp = "oauth-app";
-export type GitHubApp = "github-app";
 
-export type ExpirationType = ExpirationEnabled | ExpirationDisabled;
-export type ExpirationDisabled = false;
-export type ExpirationEnabled = true;
+// Generic session object models server response.
+export type Auth<
+  ClientType extends ClientTypes,
+  ExpirationEnabled extends boolean
+> = (ExpirationEnabled extends true
+  ? {
+      expiresAt: string;
+      refreshToken: string;
+      refreshTokenExpiresAt: string;
+    }
+  : Record<never, never>) &
+  Omit<
+    ClientType extends OAuthApp
+      ? OAuthAppAuthentication
+      : GitHubAppAuthentication,
+    "clientSecret"
+  >;
 
-// # Session
-
-// Generic session type.
-export type Session<
-  Client extends ClientType,
-  Expiration extends ExpirationType
-> = {
-  authentication: Client extends OAuthApp
-    ? Expiration extends ExpirationDisabled
-      ? Omit<AuthOAuthUser.OAuthAppAuthentication, "clientSecret">
-      : never
-    : Expiration extends ExpirationDisabled
-    ? Omit<AuthOAuthUser.GitHubAppAuthentication, "clientSecret">
-    : Omit<AuthOAuthUser.GitHubAppAuthenticationWithExpiration, "clientSecret">;
-};
-
-// # Internal State
+// ## Auth Options
 
 // `clientId` is necessary for the `signIn` command to redirect only once
 // (without relying on a `/api/github/oauth/login` endpoint.) `clientId` is
 // public information which is exposed in the first step of the [web application
 // OAuth flow](https://docs.github.com/en/developers/apps/building-oauth-apps/authorizing-oauth-apps#web-application-flow)
-export type RequiredOptions = { clientId: string };
+export type RequiredAuthOptions = { clientId: string };
 
 // Generic state properties related to client types and expiration settings.
-export type GenericState<
-  Client extends ClientType,
-  Expiration extends ExpirationType
+export type GenericAuthOptions<
+  ClientType extends ClientTypes,
+  ExpirationEnabled extends boolean
 > = {
-  clientType: Client;
-  expirationEnabled: Expiration;
-  sessionStore: false | Store<Session<Client, Expiration>>;
-  session: Session<Client, Expiration> | null;
-  defaultScopes: Client extends OAuthApp ? string[] : never;
+  clientType: ClientType;
+  expirationEnabled: ExpirationEnabled;
+  authStore: Store<Auth<ClientType, ExpirationEnabled>> | false;
+  auth: Auth<ClientType, ExpirationEnabled> | null;
 };
 
+export type Scopes<ClientType extends ClientTypes> = ClientType extends OAuthApp
+  ? { defaultScopes: string[] }
+  : Record<never, never>;
+
 // Non-generic state properties for all types of apps and expiration settings.
-export type NonGenericState = {
+export type NonGenericAuthOptions = {
   serviceOrigin: string; // Protocol, hostname, and port of backend services.
   servicePathPrefix: string; // Path prefix of backend services.
   stateStore: Store<string> | false;
-  request: OctokitTypes.RequestInterface;
+  request: RequestInterface;
 };
 
 // Store for persisting authentication or [oauth `state` for web application
 // flow](https://docs.github.com/en/developers/apps/building-oauth-apps/authorizing-oauth-apps#web-application-flow).
 export type Store<Value> = {
   get: () => Promise<Value | null>;
-  set: (value?: Value | null) => Promise<void>;
+  set: (value: Value | null) => Promise<void>;
 };
 
-// All properties in the internal state are non-optional although most of them
-// are optional in the strategy options.
-export type State<
-  Client extends ClientType,
-  Expiration extends ExpirationType
-> = RequiredOptions & GenericState<Client, Expiration> & NonGenericState;
+// All properties in `Options` are non-optional although most of them
+// are optional in the `StrategyOptions`.
+export type Options<
+  ClientType extends ClientTypes,
+  ExpirationEnabled extends boolean
+> = RequiredAuthOptions &
+  GenericAuthOptions<ClientType, ExpirationEnabled> &
+  Scopes<ClientType> &
+  NonGenericAuthOptions;
 
-// Most properties are optional in strategy options.
+// Most properties are optional in `StrategyOptions`.
 export type StrategyOptions<
-  Client extends ClientType,
-  Expiration extends ExpirationType
-> = RequiredOptions &
-  Partial<GenericState<Client, Expiration>> &
-  Partial<NonGenericState>;
+  ClientType extends ClientTypes,
+  ExpirationEnabled extends boolean
+> = RequiredAuthOptions &
+  Partial<GenericAuthOptions<ClientType, ExpirationEnabled>> &
+  Partial<Scopes<ClientType>> &
+  Partial<NonGenericAuthOptions>;
 
 // # Interface
 
@@ -101,37 +116,37 @@ export type StrategyOptions<
 // 8. [Delete an app token](https://docs.github.com/en/rest/reference/apps#delete-an-app-token) (sign out)
 // 9. [Delete an app authorization](https://docs.github.com/en/rest/reference/apps#delete-an-app-authorization)
 export type Command<
-  Client extends ClientType,
-  Expiration extends ExpirationType
+  ClientType extends ClientTypes,
+  ExpirationEnabled extends boolean
 > =
   | {
       type: "signIn";
       login?: string;
       allowSignup?: boolean;
-      scopes?: Client extends OAuthApp ? string[] : never;
+      scopes?: ClientType extends OAuthApp ? string[] : never;
     }
   | { type: "getToken" }
   | { type: "createToken" }
   | { type: "checkToken" }
-  | (Client extends GitHubApp ? { type: "createScopedToken" } : never)
+  | (ClientType extends GitHubApp ? { type: "createScopedToken" } : never)
   | { type: "resetToken" }
-  | (Expiration extends ExpirationEnabled ? { type: "refreshToken" } : never)
+  | (ExpirationEnabled extends true ? { type: "refreshToken" } : never)
   | { type: "deleteToken"; offline?: boolean }
   | { type: "deleteAuthorization" };
 
 // Authentication strategy created via `createOAuthUserClientAuth`.
 export interface AuthInterface<
-  Client extends ClientType,
-  Expiration extends ExpirationType
+  ClientType extends ClientTypes,
+  ExpirationEnabled extends boolean
 > {
-  (options?: Command<Client, Expiration>): Promise<Session<
-    Client,
-    Expiration
+  (options?: Command<ClientType, ExpirationEnabled>): Promise<Auth<
+    ClientType,
+    ExpirationEnabled
   > | null>;
 
   hook(
-    request: OctokitTypes.RequestInterface,
-    route: OctokitTypes.Route | OctokitTypes.EndpointOptions,
-    parameters?: OctokitTypes.RequestParameters
-  ): Promise<OctokitTypes.OctokitResponse<any>>;
+    request: RequestInterface,
+    route: Route | EndpointOptions,
+    parameters?: RequestParameters
+  ): Promise<OctokitResponse<any>>;
 }

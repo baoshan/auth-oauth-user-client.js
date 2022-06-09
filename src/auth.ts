@@ -1,155 +1,150 @@
-import {
-  getWebFlowAuthorizationUrl,
-  GetWebFlowAuthorizationUrlOptions,
-} from "./get-web-flow-authorization-url";
-import errors from "./errors";
-import { ClientType, ExpirationType, Session, State, Command } from "./types";
+import { errors } from "./errors";
+import { oauthAuthorizationUrl } from "./oauth-authorization-url";
+import { requestOAuthApp } from "./request-oauth-app";
+import type { ClientTypes, Command, Options, OAuthApp, Auth } from "./types";
 
-const oauthAppEndpoints = {
-  createToken: "POST /token",
-  checkToken: "GET /token",
-  createScopedToken: "POST /token/scoped",
-  resetToken: "PATCH /token",
-  refreshToken: "PATCH /refresh-token",
-  deleteToken: "DELETE /token",
-  deleteAuthorization: "DELETE /grant",
-};
-
-export async function auth<
-  Client extends ClientType,
-  Expiration extends ExpirationType
->(
-  this: State<Client, Expiration>,
-  command: Command<Client, Expiration> = { type: "getToken" }
-): Promise<Session<Client, Expiration> | null> {
-  // Send `payload` to the `@octokit/oauth-app` endpoint matching `command`.
-  const payload: any = {};
-  const requestOAuthApp = async (
-    command: keyof typeof oauthAppEndpoints,
-    session: Session<Client, Expiration> | null
-  ) => {
-    const [method, path] = oauthAppEndpoints[command].split(" ");
-    const options = Object.assign({ method, headers: {} }, payload);
-    const token = session?.authentication.token;
-    if (token) options.headers.authorization = "token " + token;
-    const route = this.serviceOrigin + this.servicePathPrefix + path;
-    return await this.request(route, options);
-  };
-
-  switch (command.type) {
-    // Clear local session and redirect to web flow authorization url.
-    case "signIn": {
-      this.session = null;
-      if (this.sessionStore) await this.sessionStore.set(null);
-      const oauthState = Math.random().toString(36).substr(2);
-      if (this.stateStore) this.stateStore.set(oauthState);
-
-      const options = {
-        clientType: this.clientType,
-        clientId: this.clientId,
-        request: this.request,
-        redirectUrl: location.href,
-        state: oauthState,
-        login: command.login,
-        allowSignup: command.allowSignup,
-      } as GetWebFlowAuthorizationUrlOptions<Client>;
-
-      if (options.clientType === "oauth-app") {
-        options.scopes = command.scopes ?? this.defaultScopes;
-      }
-
-      const { url } = getWebFlowAuthorizationUrl(options);
-      location.href = url;
-      return null;
-    }
-
-    // Unless both `code` and `state` search parameters are present, returns
-    // session from internal state, fail over to session store when internal
-    // state has no session.
-    case "getToken": {
-      const url = new URL(location.href);
-      const code = url.searchParams.get("code");
-      const receivedState = url.searchParams.get("state");
-      if (!code || !receivedState) {
-        if (this.sessionStore) this.session ??= await this.sessionStore.get();
-        if (!this.session) return null;
-        if (!("expiresAt" in this.session.authentication)) return this.session;
-        // Auto refresh for user-to-server token.
-        const expiresAt = this.session.authentication.expiresAt;
-        if (new Date(expiresAt) > new Date()) return this.session;
-        return await auth.call(this, { type: "refreshToken" } as Command<
-          Client,
-          Expiration
-        >);
-      }
-    }
-
-    // Exchange `code` parameter for an session using backend service.
-    case "createToken": {
-      const url = new URL(location.href);
-      const code = url.searchParams.get("code");
-      const receivedState = url.searchParams.get("state");
-      if (!code || !receivedState) throw errors.codeOrStateMissing;
-
-      // Received `state` must match provided.
-      if (this.stateStore) {
-        const providedState = await this.stateStore.get();
-        await this.stateStore.set(null);
-        if (receivedState !== providedState) throw errors.stateMismatch;
-      }
-
-      // Remove `code` and `state` query parameters from url.
-      url.searchParams.delete("code");
-      url.searchParams.delete("state");
-      const redirectUrl = url.href;
-      history.replaceState({}, "", redirectUrl);
-
-      // Always fallthrough as `createToken` (not `getToken`).
-      command.type = "createToken";
-      Object.assign(payload, { code, redirectUrl, state: receivedState });
-    }
-
-    case "checkToken":
-    case "createScopedToken":
-    case "resetToken":
-    case "refreshToken":
-    case "deleteToken":
-    case "deleteAuthorization": {
-      // `createToken` doesn’t need a token while the others do.
-      if (command.type !== "createToken") {
-        this.session ||= await auth.call(this);
-        if (!this.session) throw errors.unauthorized;
-      }
-      const oldSession = this.session;
-
-      // Prepare payload for `refreshToken` command.
-      if (this.session && "refreshToken" in this.session.authentication) {
-        const refreshToken = this.session.authentication.refreshToken;
-        Object.assign(payload, { refreshToken });
-      }
-
-      if (command.type === "deleteToken" && command.offline) {
-        this.session = null;
-      } else {
-        // Invoke `@octokit/oauth-app` endpoint and replace local session.
-        const response = await requestOAuthApp(command.type, this.session);
-        this.session = response.data || null;
-      }
-
-      // Some `oauth-app.js` endpoints (such as `resetToken`) do not (and can
-      // not) return `refreshToken`. Original `refreshToken` and
-      // `refreshTokenExpiresAt` are kept to `refreshToken` later.
-      if (oldSession && "refreshToken" in oldSession.authentication) {
-        if (this.session && !("refreshToken" in this.session.authentication))
-          Object.assign(this.session.authentication, {
-            refreshToken: oldSession.authentication.refreshToken,
-            refreshTokenExpiresAt:
-              oldSession.authentication.refreshTokenExpiresAt,
-          });
-      }
-
-      if (this.sessionStore) await this.sessionStore.set(this.session);
-      return this.session;
-    }
-  }
+function isAuthExpirationEnabled<
+  ClientType extends ClientTypes,
+  ExpirationEnabled extends boolean
+>(auth: Auth<ClientType, ExpirationEnabled>): auth is Auth<ClientType, true> {
+  return "expiresAt" in auth;
 }
+
+function isOptionsOAuthApp<
+  ClientType extends ClientTypes,
+  ExpirationEnabled extends boolean
+>(
+  options: Options<ClientType, ExpirationEnabled>
+): options is Options<ClientType, ExpirationEnabled> &
+  Options<OAuthApp, ExpirationEnabled> {
+  return options.clientType === "oauth-app";
+}
+
+export const auth = <
+  ClientType extends ClientTypes,
+  ExpirationEnabled extends boolean
+>(
+  options: Options<ClientType, ExpirationEnabled>
+): ((
+  command?: Command<ClientType, ExpirationEnabled>
+) => Promise<Auth<ClientType, ExpirationEnabled> | null>) => {
+  const _authStore = options.authStore || undefined;
+  const _stateStore = options.stateStore || undefined;
+
+  return async function _auth(
+    command: Command<ClientType, ExpirationEnabled> = { type: "getToken" }
+  ): Promise<Auth<ClientType, ExpirationEnabled> | null> {
+    const { type: _, ...payload } = command as Record<string, unknown>;
+    switch (command.type) {
+      case "signIn": {
+        // clear local session before redirecting
+        options.auth = null;
+        await _authStore?.set(null);
+        const state = Math.random().toString(36).substring(2);
+        _stateStore?.set(state);
+
+        // redirect
+        location.href = oauthAuthorizationUrl({
+          clientType: options.clientType,
+          clientId: options.clientId,
+          redirectUrl: location.href,
+          state,
+          login: command.login,
+          allowSignup: command.allowSignup,
+          ...(isOptionsOAuthApp(options)
+            ? { scopes: command.scopes || options.defaultScopes }
+            : {}),
+        }).url;
+        return null;
+      }
+
+      case "getToken": {
+        const url = new URL(location.href);
+        const code = url.searchParams.get("code");
+        const state = url.searchParams.get("state");
+        // returns local token unless both `code` and `state` search
+        // parameters are present
+        if (!code || !state) {
+          options.auth ||= (await _authStore?.get()) || null;
+          if (!options.auth) return null;
+
+          // auto refresh for user-to-server token
+          if (!isAuthExpirationEnabled(options.auth)) return options.auth;
+          const { expiresAt } = options.auth;
+          if (new Date(expiresAt) > new Date()) return options.auth;
+
+          const { refreshTokenExpiresAt } = options.auth;
+          if (new Date(refreshTokenExpiresAt) <= new Date()) {
+            await _authStore?.set(null);
+            return null;
+          }
+
+          return await _auth({ type: "refreshToken" } as Command<
+            ClientType,
+            ExpirationEnabled
+          >);
+        }
+      }
+
+      // Exchange `code` parameter for an session using backend service.
+      case "createToken": {
+        const url = new URL(location.href);
+        const code = url.searchParams.get("code");
+        const state = url.searchParams.get("state");
+        url.searchParams.delete("code");
+        url.searchParams.delete("state");
+        const redirectUrl = url.href;
+        history.replaceState({}, "", redirectUrl);
+
+        if (!code || !state) throw errors.codeOrStateMissing;
+
+        // received `state` should match expected
+        const expectedState = (await _stateStore?.get()) || undefined;
+        await _stateStore?.set(null);
+        if (expectedState && state !== expectedState)
+          throw errors.stateMismatch;
+
+        // do not fallthrough using `getToken`
+        command.type = "createToken";
+        Object.assign(payload, { state, code, redirectUrl });
+      }
+
+      case "checkToken":
+      case "createScopedToken":
+      case "resetToken":
+      case "refreshToken":
+      case "deleteToken":
+      case "deleteAuthorization": {
+        // `deleteToken` with `offline` set should never throw
+        if (command.type === "deleteToken" && command.offline) {
+          await _authStore?.set(null);
+          return (options.auth = null);
+        }
+
+        // `createToken` doesn’t need a token while the others do
+        if (command.type !== "createToken") {
+          options.auth ||= await _auth();
+          if (!options.auth) throw errors.unauthorized;
+        }
+
+        // payload for `refreshToken` command
+        if (command.type === "refreshToken") {
+          if (options.auth && isAuthExpirationEnabled(options.auth)) {
+            payload.refreshToken = options.auth.refreshToken;
+          } else throw errors.refreshTokenMissing;
+        }
+
+        // invoke `@octokit/oauth-app` endpoint unless delete token `offline`
+        let auth: Auth<ClientType, ExpirationEnabled> | null =
+          (await requestOAuthApp(options, command.type, options.auth, payload))
+            .data.authentication || null;
+
+        // `resetToken` returns no `refreshToken`, original `refreshToken`
+        // and `refreshTokenExpiresAt` are kept to `refreshToken` later
+        if (auth) auth = Object.assign(options.auth || {}, auth);
+        await _authStore?.set(auth);
+        return (options.auth = auth);
+      }
+    }
+  };
+};

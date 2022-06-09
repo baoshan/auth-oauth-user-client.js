@@ -164,7 +164,7 @@ The `createOAuthUserClientAuth` method accepts a single `options` object as argu
 | **`defaultScopes`**     | `string`            | Only relevant for OAuth App. See [available scopes](https://docs.github.com/en/developers/apps/scopes-for-oauth-apps#available-scopes).                                                                 |
 | **`serviceOrigin`**     | `string`            | Defaults to `location.origin`. Required only when the `@octokit/oauth-app` Node.js/Express.js/Cloudflare middleware is deployed at a different origin.                                                  |
 | **`servicePathPrefix`** | `string`            | Defaults to `"/api/github/oauth"`. Required only when the `@octokit/oauth-app` Node.js/Express.js/Cloudflare middleware is created with custom `pathPrefix`.                                            |
-| **`sessionStore`**      | `object` or `false` | Custom store to get/set [session object](#session-object), `false` to disable session persistence. See [custom store](#custom-store).                                                                   |
+| **`authStore`**         | `object` or `false` | Custom store to get/set [session object](#session-object), `false` to disable session persistence. See [custom store](#custom-store).                                                                   |
 | **`stateStore`**        | `object` or `false` | Custom store to get/set [state string](https://docs.github.com/en/developers/apps/building-oauth-apps/authorizing-oauth-apps#parameters), `false` to disable state persistence.                         |
 | **`request`**           | `function`          | You can pass in your own [`@octokit/request`](https://github.com/octokit/request.js) instance. For usage with enterprise, set `baseUrl` to the API root endpoint. See [custom request](#custom-request) |
 
@@ -173,13 +173,13 @@ The `createOAuthUserClientAuth` method accepts a single `options` object as argu
 By default, `auth-oauth-user-client.js` uses [`localStorage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage) to store JSON
 serialized session object and state string.
 
-Pass `sessionStore` or `stateStore` in `createOAuthUserClientAuth(options)` (or
+Pass `authStore` or `stateStore` in `createOAuthUserClientAuth(options)` (or
 `new Octokit({auth})`) to use your custom code to persist session or state.
 
 For example:
 
 ```js
-const sessionStore = {
+const authStore = {
   get: async() => { /* return local session or `null` when there is no session */ }
   set: async(session) => {
     if (session == null) { /* delete local session */ }
@@ -189,7 +189,7 @@ const sessionStore = {
 
 const auth = createOAuthUserClientAuth({
   clientId: "clientId123",
-  sessionStore
+  authStore
 });
 ```
 

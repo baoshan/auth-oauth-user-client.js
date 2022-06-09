@@ -29,6 +29,7 @@ describe("standalone tests under node environment", () => {
       createOAuthUserClientAuth({
         clientId: "clientId123",
         clientType: "oauth-app",
+        // @ts-ignore
         expirationEnabled: true,
       })
     ).toThrow(
@@ -41,53 +42,51 @@ describe("standalone tests under node environment", () => {
   it("get token (without session/state stores)", async () => {
     const auth = createOAuthUserClientAuth({
       clientId: "clientId123",
-      sessionStore: false,
+      authStore: false,
       stateStore: false,
     });
     expect(await auth({ type: "getToken" })).toBeNull();
   });
 
   it("get token (without cached session)", async () => {
-    const sessionStore = {
+    const authStore = {
       get: jest.fn().mockResolvedValue(null),
       set: jest.fn().mockResolvedValue(undefined),
     };
     const auth = createOAuthUserClientAuth({
       clientId: "clientId123",
-      sessionStore,
+      authStore,
     });
 
     expect(await auth({ type: "getToken" })).toBeNull();
     expect(await auth({ type: "getToken" })).toBeNull();
-    expect(sessionStore.get.mock.calls.length).toBe(2);
+    expect(authStore.get.mock.calls.length).toBe(2);
   });
 
   it("get token (with cached session)", async () => {
-    const session = { authentication: { token: "token123" } };
-    const sessionStore = {
-      get: jest.fn().mockResolvedValue(session),
+    const oldAuth = { token: "token123" };
+    const authStore = {
+      get: jest.fn().mockResolvedValue(oldAuth),
       set: jest.fn().mockResolvedValue(undefined),
     };
     const auth = createOAuthUserClientAuth({
       clientId: "clientId123",
-      sessionStore,
+      authStore,
     });
-    expect(await auth({ type: "getToken" })).toBe(session);
-    expect(await auth({ type: "getToken" })).toBe(session);
-    expect(sessionStore.get.mock.calls.length).toBe(1);
+    expect(await auth({ type: "getToken" })).toBe(oldAuth);
+    expect(await auth({ type: "getToken" })).toBe(oldAuth);
+    expect(authStore.get.mock.calls.length).toBe(1);
   });
 
   it("get token (not expired)", async () => {
-    const session = {
-      authentication: {
-        token: "token123",
-        expiresAt: "2000-01-03T00:00:00.000Z",
-        refreshToken: "refreshToken123",
-      },
+    const oldAuth = {
+      token: "token123",
+      expiresAt: "2000-01-03T00:00:00.000Z",
+      refreshToken: "refreshToken123",
     };
 
-    const sessionStore = {
-      get: jest.fn().mockResolvedValueOnce(session),
+    const authStore = {
+      get: jest.fn().mockResolvedValueOnce(oldAuth),
       set: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -95,25 +94,23 @@ describe("standalone tests under node environment", () => {
       clientId: "clientId123",
       clientType: "github-app",
       expirationEnabled: true,
-      sessionStore,
+      authStore,
     });
 
     MockDate.set("2000-01-02T00:00:00.000Z");
-    expect(await auth({ type: "getToken" })).toEqual(session);
-    expect(sessionStore.get.mock.calls.length).toBe(1);
+    expect(await auth({ type: "getToken" })).toEqual(oldAuth);
+    expect(authStore.get.mock.calls.length).toBe(1);
     MockDate.reset();
   });
 
   it("get token (expired)", async () => {
-    const oldSession = {
-      authentication: {
-        token: "token123",
-        expiresAt: "2000-01-01T00:00:00.000Z",
-        refreshToken: "refreshToken123",
-      },
+    const oldAuth = {
+      token: "token123",
+      expiresAt: "2000-01-01T00:00:00.000Z",
+      refreshToken: "refreshToken123",
     };
 
-    const newSession = {
+    const response = {
       authentication: {
         token: "token456",
         expiresAt: "2000-02-01T00:00:00.000Z",
@@ -121,16 +118,16 @@ describe("standalone tests under node environment", () => {
       },
     };
 
-    const sessionStore = {
-      get: jest.fn().mockResolvedValueOnce(oldSession),
-      set: jest.fn(async (session) => {
-        expect(session).toEqual(newSession);
+    const authStore = {
+      get: jest.fn().mockResolvedValueOnce(oldAuth),
+      set: jest.fn(async (auth) => {
+        expect(auth).toEqual(response.authentication);
       }),
     };
 
     const fetch = fetchMock
       .sandbox()
-      .patchOnce("http://acme.com/api/github/oauth/refresh-token", newSession, {
+      .patchOnce("http://acme.com/api/github/oauth/refresh-token", response, {
         headers: {
           accept: "application/vnd.github.v3+json",
           "user-agent": "test",
@@ -142,7 +139,7 @@ describe("standalone tests under node environment", () => {
     const auth = createOAuthUserClientAuth({
       clientId: "clientId123",
       clientType: "github-app",
-      sessionStore,
+      authStore,
       request: request.defaults({
         headers: { "user-agent": "test" },
         request: { fetch },
@@ -150,9 +147,9 @@ describe("standalone tests under node environment", () => {
     });
 
     MockDate.set("2000-01-02T00:00:00.000Z");
-    expect(await auth({ type: "getToken" })).toEqual(newSession);
-    expect(sessionStore.get.mock.calls.length).toBe(1);
-    expect(sessionStore.set.mock.calls.length).toBe(1);
+    expect(await auth({ type: "getToken" })).toEqual(response.authentication);
+    expect(authStore.get.mock.calls.length).toBe(1);
+    expect(authStore.set.mock.calls.length).toBe(1);
     MockDate.reset();
   });
 
@@ -161,7 +158,7 @@ describe("standalone tests under node environment", () => {
       "http://acme.com/search?q=octocat&sort=date&code=code&state=state";
     Object.assign(global, { location: new URL(href) });
 
-    const validSession = {
+    const response = {
       authentication: {
         token: "token456",
         expiresAt: "2000-02-01T00:00:00.000Z",
@@ -171,7 +168,7 @@ describe("standalone tests under node environment", () => {
 
     const fetch = fetchMock
       .sandbox()
-      .postOnce("http://acme.com/api/github/oauth/token", validSession, {
+      .postOnce("http://acme.com/api/github/oauth/token", response, {
         headers: {
           accept: "application/vnd.github.v3+json",
           "user-agent": "test",
@@ -187,7 +184,7 @@ describe("standalone tests under node environment", () => {
     const auth = createOAuthUserClientAuth({
       clientId: "clientId123",
       clientType: "oauth-app",
-      sessionStore: { get: async () => null, set: async () => {} },
+      authStore: { get: async () => null, set: async () => {} },
       stateStore: { get: async () => "state", set: async () => {} },
       request: request.defaults({
         headers: { "user-agent": "test" },
@@ -195,7 +192,7 @@ describe("standalone tests under node environment", () => {
       }),
     });
 
-    expect(await auth({ type: "getToken" })).toEqual(validSession);
+    expect(await auth({ type: "getToken" })).toEqual(response.authentication);
     // expect(replaceState.mock.calls.length).toBe(1);
     expect(location.href).toBe("http://acme.com/search?q=octocat&sort=date");
   });
@@ -205,7 +202,7 @@ describe("standalone tests under node environment", () => {
   //#region Sign In
 
   it("sign in", async () => {
-    const sessionStore = {
+    const authStore = {
       get: jest.fn().mockResolvedValue(null),
       set: jest.fn().mockImplementation(() => {}),
     };
@@ -215,16 +212,16 @@ describe("standalone tests under node environment", () => {
     };
     const auth = createOAuthUserClientAuth({
       clientId: "clientId123",
-      sessionStore,
+      authStore,
       stateStore,
     });
     await auth({ type: "signIn" });
     expect(
       location.href.startsWith("https://github.com/login/oauth/authorize")
     ).toBe(true);
-    expect(sessionStore.get.mock.calls.length).toBe(0);
-    expect(sessionStore.set.mock.calls.length).toBe(1);
-    expect(sessionStore.set.mock.calls[0][0]).toBe(null);
+    expect(authStore.get.mock.calls.length).toBe(0);
+    expect(authStore.set.mock.calls.length).toBe(1);
+    expect(authStore.set.mock.calls[0][0]).toBe(null);
     expect(stateStore.get.mock.calls.length).toBe(0);
     expect(stateStore.set.mock.calls.length).toBe(1);
     expect(stateStore.set.mock.calls[0][0]).toBe(
@@ -237,7 +234,7 @@ describe("standalone tests under node environment", () => {
       clientId: "clientId123",
       clientType: "github-app",
       expirationEnabled: true,
-      sessionStore: false,
+      authStore: false,
       stateStore: false,
     });
     await auth({ type: "signIn" });
@@ -247,7 +244,7 @@ describe("standalone tests under node environment", () => {
   });
 
   it("sign in (specified scopes)", async () => {
-    const sessionStore = {
+    const authStore = {
       get: jest.fn().mockResolvedValue(null),
       set: jest.fn(async () => {}),
     };
@@ -258,7 +255,7 @@ describe("standalone tests under node environment", () => {
     const auth = createOAuthUserClientAuth({
       clientId: "clientId123",
       clientType: "oauth-app",
-      sessionStore,
+      authStore,
       stateStore,
     });
     await auth({ type: "signIn", scopes: ["abc", "def"] });
@@ -269,7 +266,7 @@ describe("standalone tests under node environment", () => {
   });
 
   it("sign in (default scopes)", async () => {
-    const sessionStore = {
+    const authStore = {
       get: jest.fn().mockResolvedValue(null),
       set: jest.fn(async () => {}),
     };
@@ -280,7 +277,7 @@ describe("standalone tests under node environment", () => {
     const auth = createOAuthUserClientAuth({
       clientId: "clientId123",
       clientType: "oauth-app",
-      sessionStore,
+      authStore,
       stateStore,
       defaultScopes: ["abc", "def"],
     });
@@ -305,11 +302,11 @@ describe("standalone tests under node environment", () => {
       set: jest.fn().mockResolvedValue(undefined),
     };
 
-    const validSession = { authentication: { token: "token456" } };
+    const response = { authentication: { token: "token456" } };
 
     const fetch = fetchMock
       .sandbox()
-      .postOnce("http://acme.com/api/github/oauth/token", validSession, {
+      .postOnce("http://acme.com/api/github/oauth/token", response, {
         headers: {
           accept: "application/vnd.github.v3+json",
           "user-agent": "test",
@@ -324,7 +321,7 @@ describe("standalone tests under node environment", () => {
 
     const auth = createOAuthUserClientAuth({
       clientId: "clientId123",
-      sessionStore: false,
+      authStore: false,
       stateStore,
       request: request.defaults({
         headers: { "user-agent": "test" },
@@ -332,7 +329,9 @@ describe("standalone tests under node environment", () => {
       }),
     });
 
-    expect(await auth({ type: "createToken" })).toEqual(validSession);
+    expect(await auth({ type: "createToken" })).toEqual(
+      response.authentication
+    );
     expect(stateStore.get.mock.calls.length).toBe(1);
     expect(stateStore.set.mock.calls.length).toBe(1);
     expect(stateStore.set.mock.calls[0][0]).toBeNull();
@@ -383,11 +382,11 @@ describe("standalone tests under node environment", () => {
     const href =
       "http://acme.com/search?q=octocat&sort=date&code=code&state=state";
     Object.assign(global, { location: new URL(href) });
-    const session = { authentication: { token: "token123" } };
+    const response = { authentication: { token: "token123" } };
 
     const fetch = fetchMock
       .sandbox()
-      .postOnce("http://acme.com/api/github/oauth/token", session, {
+      .postOnce("http://acme.com/api/github/oauth/token", response, {
         headers: {
           accept: "application/vnd.github.v3+json",
           "user-agent": "test",
@@ -402,7 +401,7 @@ describe("standalone tests under node environment", () => {
 
     const auth = createOAuthUserClientAuth({
       clientId: "clientId123",
-      sessionStore: false,
+      authStore: false,
       stateStore: false,
       request: request.defaults({
         headers: { "user-agent": "test" },
@@ -410,8 +409,10 @@ describe("standalone tests under node environment", () => {
       }),
     });
 
-    expect(await auth({ type: "createToken" })).toEqual(session);
-    expect(await auth()).toEqual(session);
+    expect(await auth({ type: "createToken" })).toEqual(
+      response.authentication
+    );
+    expect(await auth()).toEqual(response.authentication);
     expect(replaceState.mock.calls.length).toBe(1);
     expect(location.href).toBe("http://acme.com/search?q=octocat&sort=date");
   });
@@ -421,35 +422,35 @@ describe("standalone tests under node environment", () => {
   //#region Check Token
 
   it("check token (unauthorized)", async () => {
-    const sessionStore = {
+    const authStore = {
       get: jest.fn().mockResolvedValue(null),
       set: jest.fn().mockResolvedValue(undefined),
     };
 
     const auth = createOAuthUserClientAuth({
       clientId: "clientId123",
-      sessionStore,
+      authStore,
     });
 
     await expect(
       async () => await auth({ type: "checkToken" })
-    ).rejects.toThrow("[@octokit/auth-oauth-user-client.js] Unauthorized");
-    expect(sessionStore.get.mock.calls.length).toBe(1);
-    expect(sessionStore.set.mock.calls.length).toBe(0);
+    ).rejects.toThrow("[@octokit/auth-oauth-user-client.js] Unauthorized.");
+    expect(authStore.get.mock.calls.length).toBe(1);
+    expect(authStore.set.mock.calls.length).toBe(0);
   });
 
   it("check token", async () => {
-    const newSession = { authentication: { token: "token123" } };
-    const oldSession = { authentication: { token: "token123" } };
+    const oldAuth = { token: "token123" };
+    const response = { authentication: { token: "token123" } };
 
-    const sessionStore = {
-      get: jest.fn().mockResolvedValue(oldSession),
+    const authStore = {
+      get: jest.fn().mockResolvedValue(oldAuth),
       set: jest.fn().mockResolvedValue(undefined),
     };
 
     const fetch = fetchMock
       .sandbox()
-      .getOnce("http://acme.com/api/github/oauth/token", newSession, {
+      .getOnce("http://acme.com/api/github/oauth/token", response, {
         headers: {
           accept: "application/vnd.github.v3+json",
           "user-agent": "test",
@@ -459,33 +460,33 @@ describe("standalone tests under node environment", () => {
 
     const auth = createOAuthUserClientAuth({
       clientId: "clientId123",
-      sessionStore,
+      authStore,
       request: request.defaults({
         headers: { "user-agent": "test" },
         request: { fetch },
       }),
     });
 
-    expect(await auth({ type: "checkToken" })).toEqual(newSession);
-    expect(sessionStore.get.mock.calls.length).toBe(1);
-    expect(sessionStore.set.mock.calls.length).toBe(1);
-    expect(sessionStore.set.mock.calls[0][0]).toEqual(newSession);
+    expect(await auth({ type: "checkToken" })).toEqual(response.authentication);
+    expect(authStore.get.mock.calls.length).toBe(1);
+    expect(authStore.set.mock.calls.length).toBe(1);
+    expect(authStore.set.mock.calls[0][0]).toEqual(response.authentication);
   });
 
   //#endregion
 
   it("create scoped token", async () => {
-    const oldSession = { authentication: { token: "token123" } };
-    const newSession = { authentication: { token: "token456" } };
+    const oldAuth = { token: "token123" };
+    const response = { authentication: { token: "token456" } };
 
-    const sessionStore = {
-      get: jest.fn().mockResolvedValue(oldSession),
+    const authStore = {
+      get: jest.fn().mockResolvedValue(oldAuth),
       set: jest.fn().mockResolvedValue(undefined),
     };
 
     const fetch = fetchMock
       .sandbox()
-      .postOnce("http://acme.com/api/github/oauth/token/scoped", newSession, {
+      .postOnce("http://acme.com/api/github/oauth/token/scoped", response, {
         headers: {
           accept: "application/vnd.github.v3+json",
           "user-agent": "test",
@@ -496,67 +497,128 @@ describe("standalone tests under node environment", () => {
     const auth = createOAuthUserClientAuth({
       clientId: "clientId123",
       clientType: "github-app",
-      sessionStore,
+      authStore,
       request: request.defaults({
         headers: { "user-agent": "test" },
         request: { fetch },
       }),
     });
 
-    expect(await auth({ type: "createScopedToken" })).toEqual(newSession);
-    expect(sessionStore.get.mock.calls.length).toBe(1);
-    expect(sessionStore.set.mock.calls.length).toBe(1);
-    expect(sessionStore.set.mock.calls[0][0]).toEqual(newSession);
+    expect(await auth({ type: "createScopedToken" })).toEqual(
+      response.authentication
+    );
+    expect(authStore.get.mock.calls.length).toBe(1);
+    expect(authStore.set.mock.calls.length).toBe(1);
+    expect(authStore.set.mock.calls[0][0]).toEqual(response.authentication);
+  });
+
+  it("refresh token (refresh token missing)", async () => {
+    const oldAuth = { token: "token123" };
+
+    const authStore = {
+      get: jest.fn().mockResolvedValue(oldAuth),
+      set: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const auth = createOAuthUserClientAuth({
+      clientId: "clientId123",
+      clientType: "github-app",
+      expirationEnabled: true,
+      authStore,
+    });
+
+    await expect(async () => auth({ type: "refreshToken" })).rejects.toThrow(
+      "[@octokit/auth-oauth-user-client.js] Refresh token missing."
+    );
+  });
+
+  it("refresh token expired", async () => {
+    const oldAuth = {
+      refreshToken: "refresh_token_123",
+      expiresAt: "2000-01-01T00:00:00.000Z",
+      refreshTokenExpiresAt: "2000-01-02T00:00:00.000Z",
+      token: "token123",
+    };
+
+    const authStore = {
+      get: jest.fn().mockResolvedValue(oldAuth),
+      set: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const auth = createOAuthUserClientAuth({
+      clientId: "clientId123",
+      clientType: "github-app",
+      expirationEnabled: true,
+      authStore,
+    });
+
+    expect(await auth()).toEqual(null);
   });
 
   it("refresh token", async () => {
-    const oldSession = { authentication: { token: "token123" } };
-    const newSession = { authentication: { token: "token456" } };
+    const oldAuth = {
+      refreshToken: "refresh_token_123",
+      expiresAt: "3000-01-03T00:00:00.000Z",
+      refreshTokenExpiresAt: "3000-01-03T00:00:00.000Z",
+      token: "token123",
+    };
+    const response = {
+      authentication: {
+        refreshToken: "refresh_token_456",
+        expiresAt: "3001-01-03T00:00:00.000Z",
+        refreshTokenExpiresAt: "3001-01-03T00:00:00.000Z",
+        token: "token456",
+      },
+    };
 
-    const sessionStore = {
-      get: jest.fn().mockResolvedValue(oldSession),
+    const authStore = {
+      get: jest.fn().mockResolvedValue(oldAuth),
       set: jest.fn().mockResolvedValue(undefined),
     };
 
     const fetch = fetchMock
       .sandbox()
-      .patchOnce("http://acme.com/api/github/oauth/refresh-token", newSession, {
+      .patchOnce("http://acme.com/api/github/oauth/refresh-token", response, {
         headers: {
           accept: "application/vnd.github.v3+json",
           "user-agent": "test",
           authorization: "token token123",
+          "content-type": "application/json; charset=utf-8",
         },
+        body: { refreshToken: "refresh_token_123" },
       });
 
     const auth = createOAuthUserClientAuth({
       clientId: "clientId123",
       clientType: "github-app",
       expirationEnabled: true,
-      sessionStore,
+      authStore,
       request: request.defaults({
         headers: { "user-agent": "test" },
         request: { fetch },
       }),
     });
 
-    expect(await auth({ type: "refreshToken" })).toEqual(newSession);
-    expect(sessionStore.get.mock.calls.length).toBe(1);
-    expect(sessionStore.set.mock.calls.length).toBe(1);
-    expect(sessionStore.set.mock.calls[0][0]).toEqual(newSession);
+    expect(await auth({ type: "refreshToken" })).toEqual(
+      response.authentication
+    );
+    expect(authStore.get.mock.calls.length).toBe(1);
+    expect(authStore.set.mock.calls.length).toBe(1);
+    expect(authStore.set.mock.calls[0][0]).toEqual(response.authentication);
   });
 
   it("reset token", async () => {
-    const oldSession = { authentication: { token: "token123" } };
-    const newSession = { authentication: { token: "token456" } };
+    const oldAuth = { token: "token123" };
+    const response = { authentication: { token: "token456" } };
 
-    const sessionStore = {
-      get: jest.fn().mockResolvedValue(oldSession),
+    const authStore = {
+      get: jest.fn().mockResolvedValue(oldAuth),
       set: jest.fn().mockResolvedValue(undefined),
     };
 
     const fetch = fetchMock
       .sandbox()
-      .patchOnce("http://acme.com/api/github/oauth/token", newSession, {
+      .patchOnce("http://acme.com/api/github/oauth/token", response, {
         headers: {
           accept: "application/vnd.github.v3+json",
           "user-agent": "test",
@@ -566,24 +628,24 @@ describe("standalone tests under node environment", () => {
 
     const auth = createOAuthUserClientAuth({
       clientId: "clientId123",
-      sessionStore,
+      authStore,
       request: request.defaults({
         headers: { "user-agent": "test" },
         request: { fetch },
       }),
     });
 
-    expect(await auth({ type: "resetToken" })).toEqual(newSession);
-    expect(sessionStore.get.mock.calls.length).toBe(1);
-    expect(sessionStore.set.mock.calls.length).toBe(1);
-    expect(sessionStore.set.mock.calls[0][0]).toEqual(newSession);
+    expect(await auth({ type: "resetToken" })).toEqual(response.authentication);
+    expect(authStore.get.mock.calls.length).toBe(1);
+    expect(authStore.set.mock.calls.length).toBe(1);
+    expect(authStore.set.mock.calls[0][0]).toEqual(response.authentication);
   });
 
   it("delete token", async () => {
-    const session = { authentication: { token: "token123" } };
+    const oldAuth = { token: "token123" };
 
-    const sessionStore = {
-      get: jest.fn().mockResolvedValue(session),
+    const authStore = {
+      get: jest.fn().mockResolvedValue(oldAuth),
       set: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -599,7 +661,7 @@ describe("standalone tests under node environment", () => {
 
     const auth = createOAuthUserClientAuth({
       clientId: "clientId123",
-      sessionStore,
+      authStore,
       request: request.defaults({
         headers: { "user-agent": "test" },
         request: { fetch },
@@ -607,35 +669,35 @@ describe("standalone tests under node environment", () => {
     });
 
     expect(await auth({ type: "deleteToken" })).toBeNull();
-    expect(sessionStore.get.mock.calls.length).toEqual(1);
-    expect(sessionStore.set.mock.calls.length).toEqual(1);
-    expect(sessionStore.set.mock.calls[0][0]).toBeNull();
+    expect(authStore.get.mock.calls.length).toEqual(1);
+    expect(authStore.set.mock.calls.length).toEqual(1);
+    expect(authStore.set.mock.calls[0][0]).toBeNull();
   });
 
   it("delete token (offline)", async () => {
-    const session = { authentication: { token: "token123" } };
+    const oldAuth = { token: "token123" };
 
-    const sessionStore = {
-      get: jest.fn().mockResolvedValue(session),
+    const authStore = {
+      get: jest.fn().mockResolvedValue(oldAuth),
       set: jest.fn().mockResolvedValue(undefined),
     };
 
     const auth = createOAuthUserClientAuth({
       clientId: "clientId123",
-      sessionStore,
+      authStore,
     });
 
     expect(await auth({ type: "deleteToken", offline: true })).toBeNull();
-    expect(sessionStore.get.mock.calls.length).toEqual(1);
-    expect(sessionStore.set.mock.calls.length).toEqual(1);
-    expect(sessionStore.set.mock.calls[0][0]).toBeNull();
+    expect(authStore.get.mock.calls.length).toEqual(0);
+    expect(authStore.set.mock.calls.length).toEqual(1);
+    expect(authStore.set.mock.calls[0][0]).toBeNull();
   });
 
   it("delete authorization", async () => {
-    const session = { authentication: { token: "token123" } };
+    const oldAuth = { token: "token123" };
 
-    const sessionStore = {
-      get: jest.fn().mockResolvedValue(session),
+    const authStore = {
+      get: jest.fn().mockResolvedValue(oldAuth),
       set: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -651,7 +713,7 @@ describe("standalone tests under node environment", () => {
 
     const auth = createOAuthUserClientAuth({
       clientId: "clientId123",
-      sessionStore,
+      authStore,
       request: request.defaults({
         headers: { "user-agent": "test" },
         request: { fetch },
@@ -659,29 +721,28 @@ describe("standalone tests under node environment", () => {
     });
 
     expect(await auth({ type: "deleteAuthorization" })).toBeNull();
-    expect(sessionStore.get.mock.calls.length).toEqual(1);
-    expect(sessionStore.set.mock.calls.length).toEqual(1);
-    expect(sessionStore.set.mock.calls[0][0]).toBeNull();
+    expect(authStore.get.mock.calls.length).toEqual(1);
+    expect(authStore.set.mock.calls.length).toEqual(1);
+    expect(authStore.set.mock.calls[0][0]).toBeNull();
   });
 
   it("keeps refresh token", async () => {
-    const oldSession = {
-      authentication: {
-        token: "token123",
-        refreshToken: "refreshToken123",
-        refreshTokenExpiresAt: "2000-01-03T00:00:00.000Z",
-      },
+    const oldAuth = {
+      token: "token123",
+      expiresAt: "3000-01-03T00:00:00.000Z",
+      refreshToken: "refreshToken123",
+      refreshTokenExpiresAt: "3000-01-03T00:00:00.000Z",
     };
-    const newSession = { authentication: { token: "token456" } };
+    const response = { authentication: { token: "token456" } };
 
-    const sessionStore = {
-      get: jest.fn().mockResolvedValue(oldSession),
+    const authStore = {
+      get: jest.fn().mockResolvedValue(oldAuth),
       set: jest.fn().mockResolvedValue(undefined),
     };
 
     const fetch = fetchMock
       .sandbox()
-      .patchOnce("http://acme.com/api/github/oauth/token", newSession, {
+      .patchOnce("http://acme.com/api/github/oauth/token", response, {
         headers: {
           accept: "application/vnd.github.v3+json",
           "user-agent": "test",
@@ -691,7 +752,7 @@ describe("standalone tests under node environment", () => {
 
     const auth = createOAuthUserClientAuth({
       clientId: "clientId123",
-      sessionStore,
+      authStore,
       request: request.defaults({
         headers: { "user-agent": "test" },
         request: { fetch },
@@ -699,20 +760,18 @@ describe("standalone tests under node environment", () => {
     });
 
     expect(await auth({ type: "resetToken" })).toEqual({
-      authentication: {
-        token: "token456",
-        refreshToken: "refreshToken123",
-        refreshTokenExpiresAt: "2000-01-03T00:00:00.000Z",
-      },
+      token: "token456",
+      expiresAt: "3000-01-03T00:00:00.000Z",
+      refreshToken: "refreshToken123",
+      refreshTokenExpiresAt: "3000-01-03T00:00:00.000Z",
     });
-    expect(sessionStore.get.mock.calls.length).toBe(1);
-    expect(sessionStore.set.mock.calls.length).toBe(1);
+    expect(authStore.get.mock.calls.length).toBe(1);
+    expect(authStore.set.mock.calls.length).toBe(1);
     expect(await auth()).toEqual({
-      authentication: {
-        token: "token456",
-        refreshToken: "refreshToken123",
-        refreshTokenExpiresAt: "2000-01-03T00:00:00.000Z",
-      },
+      token: "token456",
+      expiresAt: "3000-01-03T00:00:00.000Z",
+      refreshToken: "refreshToken123",
+      refreshTokenExpiresAt: "3000-01-03T00:00:00.000Z",
     });
   });
 });
