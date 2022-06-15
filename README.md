@@ -13,12 +13,13 @@ with `auth-oauth-user-client.js`.
 
 Load directly from CDNs:
 
-- jsdelivr:
-  `https://cdn.jsdelivr.net/gh/octokit/auth-oauth-user-client.js@v0.1.0/dist/index.min.js`
+- `https://esm.sh/octokit-auth-oauth-user-client@0.1.2`
+- `https://cdn.skypack.dev/octokit-auth-oauth-user-client@0.1.2`
+- `https://cdn.jsdelivr.net/npm/octokit-auth-oauth-user-client@0.1.2`
 
 ```html
 <script type="module">
-  import { createOAuthUserClientAuth } from "https://cdn.jsdelivr.net/gh/octokit/auth-oauth-user-client.js@v0.1.0/dist/index.min.js";
+  import { createOAuthUserClientAuth } from "https://esm.sh/octokit-auth-oauth-user-client@0.1.2";
 </script>
 ```
 
@@ -231,8 +232,8 @@ Although targeting browsers, this module is written, tested, and bundled using
 
 - test: `deno test --location=https://acme.com/search?q=octokit --coverage=cov_profile`
 - show coverage: `deno coverage cov_profile`
-- bundle: `deno bundle src/index.ts dist/index.bundle.js`
-- minify: `esbuild dist/index.bundle.js --minify --outfile=dist/index.min.js`
+- create npm package: `deno run -A scripts/build_npm.ts x.x.x`
+- bundle using deno: `deno bundle src/index.ts index.bundle.js`
 
 ## Contributing
 

@@ -1,4 +1,3 @@
-/// <reference lib="dom" />
 import { auth } from "./auth.ts";
 import { createStore } from "./create-store.ts";
 import { hook } from "./hook.ts";

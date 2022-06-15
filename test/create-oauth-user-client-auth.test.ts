@@ -1,5 +1,5 @@
 import { Octokit } from "octokit";
-import { createOAuthUserClientAuth } from "../src/index.ts";
+import { createOAuthUserClientAuth } from "../src/create-oauth-user-client-auth.ts";
 import { AuthStrategyOptions, GitHubApp } from "../src/types.ts";
 import { createServerResponse } from "./utils.ts";
 import {

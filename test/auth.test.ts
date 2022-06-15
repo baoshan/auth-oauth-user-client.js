@@ -1,4 +1,4 @@
-import { createOAuthUserClientAuth } from "../src/index.ts";
+import { createOAuthUserClientAuth } from "../src/create-oauth-user-client-auth.ts";
 import { NAME, VERSION } from "../src/metadata.ts";
 import { Auth, GitHubApp } from "../src/types.ts";
 import { createServerAuthenticationResponse } from "./utils.ts";
