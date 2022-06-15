@@ -1,11 +1,19 @@
-import { createOAuthUserClientAuth } from "../src/create-oauth-user-client-auth.ts";
-import { NAME, VERSION } from "../src/metadata.ts";
-import { Auth, GitHubApp } from "../src/types.ts";
-import { createServerAuthenticationResponse } from "./utils.ts";
 import {
+  Auth,
+  AuthStrategyOptions,
+  createOAuthUserClientAuth,
+  GitHubApp,
+  NAME,
+  VERSION,
+} from "./mod.ts";
+import { Octokit } from "@octokit/core";
+import {
+  assert,
   assertEquals,
+  assertObjectMatch,
   assertRejects,
   assertStrictEquals,
+  assertThrows,
 } from "std/testing/asserts.ts";
 import {
   assertSpyCall,
@@ -14,6 +22,128 @@ import {
   spy,
   stub,
 } from "std/testing/mock.ts";
+
+export const createServerResponse = (body: unknown) =>
+  Promise.resolve(
+    new Response(body ? JSON.stringify(body) : null, {
+      status: body ? 200 : 204,
+      headers: body
+        ? { "content-type": "application/json; charset=utf-8" }
+        : {},
+    }),
+  );
+
+export const createServerAuthenticationResponse = (auth: unknown) =>
+  createServerResponse(auth ? { authentication: auth } : null);
+
+const gitHubAppExpirationDisabledAuth = {
+  tokenType: "oauth",
+  type: "token",
+  clientId: "client_id",
+  clientType: "github-app",
+  token: "token_123",
+} as const;
+
+Deno.test({
+  name: "can not perform basic authentication",
+  sanitizeResources: false,
+  sanitizeOps: false,
+  fn: async () => {
+    const clientAuthOptions: AuthStrategyOptions<GitHubApp, false> = {
+      clientId,
+      clientType: githubApp,
+      expirationEnabled: false,
+      auth: gitHubAppExpirationDisabledAuth,
+    };
+
+    const octokit = new Octokit({
+      authStrategy: createOAuthUserClientAuth,
+      auth: clientAuthOptions,
+    });
+
+    await assertRejects(
+      () => octokit.request(`GET /applications/${clientId}/token`),
+      Error,
+      "Basic authentication is unsupported.",
+    );
+
+    localStorage.clear();
+  },
+});
+
+Deno.test("do not intercept oauth web flow requests", async () => {
+  const userServer = { foo: "bar" };
+  const response = createServerResponse(userServer);
+  const fetchStub = stub(window, "fetch", returnsNext([response]));
+
+  const clientAuthOptions: AuthStrategyOptions<GitHubApp, false> = {
+    clientId,
+    clientType: githubApp,
+    expirationEnabled: false,
+    auth: gitHubAppExpirationDisabledAuth,
+  };
+
+  const octokit = new Octokit({
+    authStrategy: createOAuthUserClientAuth,
+    auth: clientAuthOptions,
+    request: { fetch: fetchStub },
+  });
+
+  await octokit.request("GET /login/oauth/access_token");
+  assert(!("authorization" in fetchStub.calls[0].args[1]?.headers!));
+
+  fetchStub.restore();
+  localStorage.clear();
+});
+
+Deno.test("expiration disabled for oauth app currently", () => {
+  assertThrows(
+    () =>
+      createOAuthUserClientAuth({
+        clientId,
+        clientType: oauthApp,
+        expirationEnabled: true,
+      }),
+    Error,
+    "OAuth App does not support token expiration.",
+  );
+});
+
+Deno.test("get authenticated user", async () => {
+  const userServer = { foo: "bar" };
+  const response = createServerResponse(userServer);
+  const fetchStub = stub(window, "fetch", returnsNext([response]));
+
+  const clientAuthOptions: AuthStrategyOptions<GitHubApp, false> = {
+    clientId,
+    clientType: githubApp,
+    expirationEnabled: false,
+    auth: gitHubAppExpirationDisabledAuth,
+  };
+
+  const octokit = new Octokit({
+    authStrategy: createOAuthUserClientAuth,
+    auth: clientAuthOptions,
+    request: { fetch: fetchStub },
+  });
+
+  assertEquals(localStorage.length, 1);
+
+  const { data: userClient } = await octokit.request("GET /user");
+
+  assertEquals<unknown>(userClient, userServer);
+  assertEquals(fetchStub.calls[0].args[0], "https://api.github.com/user");
+  assertObjectMatch(fetchStub.calls[0].args[1]!, {
+    method: "GET",
+    headers: {
+      accept: "application/vnd.github.v3+json",
+      authorization: `token ${gitHubAppExpirationDisabledAuth.token}`,
+    },
+  });
+
+  fetchStub.restore();
+  localStorage.clear();
+});
 
 const userAgent = `${NAME}/${VERSION} ${navigator.userAgent}`;
 

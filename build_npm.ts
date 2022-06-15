@@ -1,9 +1,9 @@
 import { build, emptyDir } from "https://deno.land/x/dnt/mod.ts";
-import denoConfig from "../deno.json" assert { type: "json" };
+import denoConfig from "./deno.json" assert { type: "json" };
 
 await emptyDir("./npm");
 await build({
-  compilerOptions: { lib: ["es2021", "dom"] },
+  compilerOptions: { lib: ["esnext", "dom"] },
   entryPoints: ["./mod.ts"],
   outDir: "./npm",
   shims: { deno: false },

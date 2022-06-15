@@ -13,9 +13,9 @@ with `auth-oauth-user-client.js`.
 
 Load directly from CDNs:
 
-- `https://esm.sh/octokit-auth-oauth-user-client@0.1.2`
-- `https://cdn.skypack.dev/octokit-auth-oauth-user-client@0.1.2`
-- `https://cdn.jsdelivr.net/npm/octokit-auth-oauth-user-client@0.1.2`
+- `https://esm.sh/octokit-auth-oauth-user-client@0.1.3`
+- `https://cdn.skypack.dev/octokit-auth-oauth-user-client@0.1.3`
+- `https://cdn.jsdelivr.net/npm/octokit-auth-oauth-user-client@0.1.3`
 
 ```html
 <script type="module">
@@ -232,8 +232,8 @@ Although targeting browsers, this module is written, tested, and bundled using
 
 - test: `deno test --location=https://acme.com/search?q=octokit --coverage=cov_profile`
 - show coverage: `deno coverage cov_profile`
-- create npm package: `deno run -A scripts/build_npm.ts x.x.x`
-- bundle using deno: `deno bundle src/index.ts index.bundle.js`
+- create npm package: `deno run -A build_npm.ts x.x.x`
+- bundle using deno: `deno bundle mod.ts index.bundle.js`
 
 ## Contributing
 
