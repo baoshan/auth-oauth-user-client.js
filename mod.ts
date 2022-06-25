@@ -99,10 +99,10 @@ export type Auth<
   ExpirationEnabled extends boolean,
 > =
   & (ExpirationEnabled extends true ? {
-    expiresAt: string;
-    refreshToken: string;
-    refreshTokenExpiresAt: string;
-  }
+      expiresAt: string;
+      refreshToken: string;
+      refreshTokenExpiresAt: string;
+    }
     : Record<never, never>)
   & Omit<
     (ClientType extends OAuthApp ? OAuthAppAuthentication
@@ -245,8 +245,14 @@ const auth = <
     token: string | null,
     body: Record<string, unknown> | null,
   ) => {
-    let auth = (await fetchOAuthApp(state, type, token, body))
-      ?.authentication || null;
+    let auth: Auth<ClientType, ExpirationEnabled> | null = null;
+    try {
+      auth = (await fetchOAuthApp(state, type, token, body))
+        ?.authentication || null;
+    } catch (error) {
+      if (/bad_refresh_token/.test(error.message)) auth = null;
+      else throw error;
+    }
     if (auth) auth = { ...(state.auth || {}), ...auth };
     return await setAuth(auth);
   };
@@ -313,11 +319,7 @@ const auth = <
         if (stateStore && (newState != oldState)) {
           throw Error("State mismatch.");
         }
-        return await fetchAuth("createToken", null, {
-          state: newState, // TODO: this is unnecessary, update oauth-app
-          code,
-          redirectUrl,
-        });
+        return await fetchAuth("createToken", null, { code, redirectUrl });
       }
 
       case "checkToken":

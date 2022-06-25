@@ -3,5 +3,10 @@
   "compilerOptions": {
     "exactOptionalPropertyTypes": true,
     "lib": ["deno.ns", "dom"]
+  },
+  "tasks": {
+    "test": "deno test --location='https://acme.com/search?q=octokit' --coverage=cov_profile",
+    "coverage": "deno coverage cov_profile",
+    "build_npm": "deno run -A build_npm.ts"
   }
 }

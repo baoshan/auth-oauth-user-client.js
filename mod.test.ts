@@ -482,7 +482,6 @@ Deno.test("create token", async (t) => {
             accept: "application/json",
           },
           body: JSON.stringify({
-            "state": "state",
             "code": "code",
             "redirectUrl": "https://acme.com/search?q=octokit",
           }),
@@ -540,7 +539,6 @@ Deno.test("create token", async (t) => {
             accept: "application/json",
           },
           body: JSON.stringify({
-            "state": "state",
             "code": "code",
             "redirectUrl": "https://acme.com/search?q=octokit",
           }),
@@ -619,7 +617,6 @@ Deno.test("create token", async (t) => {
             accept: "application/json",
           },
           body: JSON.stringify({
-            "state": "state",
             "code": "code",
             "redirectUrl": "https://acme.com/search?q=octokit",
           }),
@@ -677,7 +674,6 @@ Deno.test("create token", async (t) => {
             accept: "application/json",
           },
           body: JSON.stringify({
-            "state": "state",
             "code": "code",
             "redirectUrl": "https://acme.com/search?q=octokit",
           }),
@@ -1265,6 +1261,49 @@ Deno.test("delete token", async (t) => {
             authorization: `token ${gitHubAppExpiringValidAuth.token}`,
             accept: "application/json",
           },
+        },
+      ],
+    });
+
+    assertEquals(localStorage.length, 0);
+
+    fetchStub.restore();
+    localStorage.clear();
+  });
+
+  await t.step("on service error (bad_refresh_token)", async () => {
+    const response = Promise.resolve(
+      new Response("bad_refresh_token", { status: 400 }),
+    );
+    const fetchStub = stub(window, "fetch", returnsNext([response]));
+    const authenticator = createOAuthUserClientAuth({
+      clientId,
+      clientType: githubApp,
+      expirationEnabled: true,
+      auth: gitHubAppExpiredRenewableAuth,
+    });
+
+    await assertRejects(
+      () => authenticator({ type: "deleteToken" }),
+      Error,
+      "Unauthorized.",
+    );
+
+    assertSpyCalls(fetchStub, 1);
+    assertSpyCall(fetchStub, 0, {
+      args: [
+        "https://acme.com/api/github/oauth/refresh-token",
+        {
+          method: "PATCH",
+          headers: {
+            "user-agent": userAgent,
+            authorization: `token ${gitHubAppExpiredRenewableAuth.token}`,
+            "content-type": "application/json; charset=utf-8",
+            accept: "application/json",
+          },
+          body: JSON.stringify({
+            refreshToken: gitHubAppExpiredRenewableAuth.refreshToken,
+          }),
         },
       ],
     });

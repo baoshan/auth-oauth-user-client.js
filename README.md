@@ -4,7 +4,7 @@ Authentication strategy for Octokit without exposing client secret.
 
 ## Backend service
 
-`auth-oauth-user-client.js` requires a backend service to function.
+`octokit-auth-oauth-user-client.js` requires a backend service to function.
 [`@octokit/oauth-app`](https://github.com/octokit/oauth-app.js) provides the
 compatible Node.js/Express.js/Cloudflare Worker/Deno middlewares to interact
 with `auth-oauth-user-client.js`.
@@ -13,13 +13,14 @@ with `auth-oauth-user-client.js`.
 
 Load directly from CDNs:
 
-- `https://esm.sh/octokit-auth-oauth-user-client@0.1.3`
-- `https://cdn.skypack.dev/octokit-auth-oauth-user-client@0.1.3`
-- `https://cdn.jsdelivr.net/npm/octokit-auth-oauth-user-client@0.1.3`
+- `https://esm.sh/octokit-auth-oauth-user-client@0.1.4`
+- `https://cdn.skypack.dev/octokit-auth-oauth-user-client@0.1.4`
+- `https://cdn.jsdelivr.net/npm/octokit-auth-oauth-user-client@0.1.4`
+- `https://unpkg.com/octokit-auth-oauth-user-client@0.1.4`
 
 ```html
 <script type="module">
-  import { createOAuthUserClientAuth } from "https://esm.sh/octokit-auth-oauth-user-client@0.1.2";
+  import { createOAuthUserClientAuth } from "https://esm.sh/octokit-auth-oauth-user-client@0.1.4";
 </script>
 ```
 
@@ -82,7 +83,7 @@ if (!auth) await authenticator({ type: "signIn" });
 
 ## Usage with Octokit
 
-To use `@octokit/auth-oauth-user-client` with
+To use `octokit-auth-oauth-user-client` with
 [`@octokit/core`](https://github.com/octokit/core.js)-compatible
 modules, specify the authentication strategy and authentication strategy
 options.
@@ -90,7 +91,7 @@ options.
 ```html
 <script type="module">
   import { Octokit } from "https://cdn.skypack.dev/@octokit/octokit";
-  import { createOAuthUserClientAuth } from "https://cdn.jsdelivr.net/gh/octokit/auth-oauth-user-client.js@v0.1.0/dist/index.min.js";
+  import { createOAuthUserClientAuth } from "https://esm.sh/octokit-auth-oauth-user-client@0.1.4";
 
   const octokit = new Octokit({
     authStrategy: createOAuthUserClientAuth,
@@ -112,7 +113,7 @@ Or
 ```html
 <script type="module">
   import { Octokit } from "https://cdn.skypack.dev/@octokit/core";
-  import { createOAuthUserClientAuth } from "https://cdn.jsdelivr.net/gh/octokit/auth-oauth-user-client.js@v0.1.0/dist/index.min.js";
+  import { createOAuthUserClientAuth } from "https://esm.sh/octokit-auth-oauth-user-client@0.1.4";
 
   const octokit = new Octokit({
     authStrategy: createOAuthUserClientAuth,
@@ -230,9 +231,9 @@ The differences are
 Although targeting browsers, this module is written, tested, and bundled using
 [Deno](https://deno.land) for its simplicity.
 
-- test: `deno test --location=https://acme.com/search?q=octokit --coverage=cov_profile`
-- show coverage: `deno coverage cov_profile`
-- create npm package: `deno run -A build_npm.ts x.x.x`
+- test: `deno task test`
+- show coverage: `deno task coverage`
+- create npm package: `deno task npm_build x.x.x`
 - bundle using deno: `deno bundle mod.ts index.bundle.js`
 
 ## Contributing
