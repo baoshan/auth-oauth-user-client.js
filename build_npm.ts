@@ -17,10 +17,10 @@ await build({
     license: "MIT",
     repository: {
       type: "git",
-      url: "git+https://github.com/baoshan/auth-oauth-user-client.js.git",
+      url: "git+https://github.com/baoshan/octokit-auth-oauth-user-client.js.git",
     },
     bugs: {
-      url: "https://github.com/baoshan/auth-oauth-user-client.js/issues",
+      url: "https://github.com/baoshan/octokit-auth-oauth-user-client.js/issues",
     },
   },
 });

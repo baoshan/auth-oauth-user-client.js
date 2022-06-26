@@ -17,14 +17,14 @@ with `auth-oauth-user-client.js`.
 
 Load directly from CDNs:
 
-- `https://esm.sh/octokit-auth-oauth-user-client@0.1.4`
-- `https://cdn.skypack.dev/octokit-auth-oauth-user-client@0.1.4`
-- `https://cdn.jsdelivr.net/npm/octokit-auth-oauth-user-client@0.1.4`
-- `https://unpkg.com/octokit-auth-oauth-user-client@0.1.4`
+- `https://esm.sh/octokit-auth-oauth-user-client@0.1.5`
+- `https://cdn.skypack.dev/octokit-auth-oauth-user-client@0.1.5`
+- `https://cdn.jsdelivr.net/npm/octokit-auth-oauth-user-client@0.1.5`
+- `https://unpkg.com/octokit-auth-oauth-user-client@0.1.5`
 
 ```html
 <script type="module">
-  import { createOAuthUserClientAuth } from "https://esm.sh/octokit-auth-oauth-user-client@0.1.4";
+  import { createOAuthUserClientAuth } from "https://esm.sh/octokit-auth-oauth-user-client@0.1.5";
 </script>
 ```
 
@@ -95,7 +95,7 @@ options.
 ```html
 <script type="module">
   import { Octokit } from "https://cdn.skypack.dev/@octokit/octokit";
-  import { createOAuthUserClientAuth } from "https://esm.sh/octokit-auth-oauth-user-client@0.1.4";
+  import { createOAuthUserClientAuth } from "https://esm.sh/octokit-auth-oauth-user-client@0.1.5";
 
   const octokit = new Octokit({
     authStrategy: createOAuthUserClientAuth,
@@ -117,7 +117,7 @@ Or
 ```html
 <script type="module">
   import { Octokit } from "https://cdn.skypack.dev/@octokit/core";
-  import { createOAuthUserClientAuth } from "https://esm.sh/octokit-auth-oauth-user-client@0.1.4";
+  import { createOAuthUserClientAuth } from "https://esm.sh/octokit-auth-oauth-user-client@0.1.5";
 
   const octokit = new Octokit({
     authStrategy: createOAuthUserClientAuth,
@@ -237,7 +237,7 @@ Although targeting browsers, this module is written, tested, and bundled using
 
 - test: `deno task test`
 - show coverage: `deno task coverage`
-- create npm package: `deno task npm_build x.x.x`
+- create npm package: `deno task build_npm x.x.x`
 - bundle using deno: `deno bundle mod.ts index.bundle.js`
 
 ## Contributing
