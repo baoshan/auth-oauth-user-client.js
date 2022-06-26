@@ -9,6 +9,10 @@ Authentication strategy for Octokit without exposing client secret.
 compatible Node.js/Express.js/Cloudflare Worker/Deno middlewares to interact
 with `auth-oauth-user-client.js`.
 
+## NPM
+
+`npm install octokit-auth-oauth-user-client`
+
 ## Browsers
 
 Load directly from CDNs:
