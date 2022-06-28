@@ -94,7 +94,7 @@ options.
 
 ```html
 <script type="module">
-  import { Octokit } from "https://cdn.skypack.dev/@octokit/octokit";
+  import { Octokit } from "https://cdn.skypack.dev/octokit";
   import { createOAuthUserClientAuth } from "https://esm.sh/octokit-auth-oauth-user-client@0.1.5";
 
   const octokit = new Octokit({
