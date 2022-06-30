@@ -1,13 +1,13 @@
-# auth-oauth-user-client.js
+# octokit-auth-oauth-user-client.js
 
 Authentication strategy for Octokit without exposing client secret.
 
-## Backend service
+## Backend Service
 
 `octokit-auth-oauth-user-client.js` requires a backend service to function.
 [`@octokit/oauth-app`](https://github.com/octokit/oauth-app.js) provides the
 compatible Node.js/Express.js/Cloudflare Worker/Deno middlewares to interact
-with `auth-oauth-user-client.js`.
+with `octokit-auth-oauth-user-client.js`.
 
 ## NPM
 
@@ -153,7 +153,7 @@ The `createOAuthUserClientAuth` method accepts a single `options` object as argu
 
 ### Custom Store
 
-By default, `auth-oauth-user-client.js` uses [`localStorage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage) to store JSON
+By default, `octokit-auth-oauth-user-client.js` uses [`localStorage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage) to store JSON
 serialized authentication object and `state` string.
 
 Pass `authStore` or `stateStore` in `createOAuthUserClientAuth(options)` (or
