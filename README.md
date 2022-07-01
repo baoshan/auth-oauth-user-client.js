@@ -17,14 +17,14 @@ with `octokit-auth-oauth-user-client.js`.
 
 Load directly from CDNs:
 
-- `https://esm.sh/octokit-auth-oauth-user-client@0.1.5`
-- `https://cdn.skypack.dev/octokit-auth-oauth-user-client@0.1.5`
-- `https://cdn.jsdelivr.net/npm/octokit-auth-oauth-user-client@0.1.5`
-- `https://unpkg.com/octokit-auth-oauth-user-client@0.1.5`
+- `https://esm.sh/octokit-auth-oauth-user-client@0.1.6`
+- `https://cdn.skypack.dev/octokit-auth-oauth-user-client@0.1.6`
+- `https://cdn.jsdelivr.net/npm/octokit-auth-oauth-user-client@0.1.6`
+- `https://unpkg.com/octokit-auth-oauth-user-client@0.1.6`
 
 ```html
 <script type="module">
-  import { createOAuthUserClientAuth } from "https://esm.sh/octokit-auth-oauth-user-client@0.1.5";
+  import { createOAuthUserClientAuth } from "https://esm.sh/octokit-auth-oauth-user-client@0.1.6";
 </script>
 ```
 
@@ -95,7 +95,7 @@ options.
 ```html
 <script type="module">
   import { Octokit } from "https://cdn.skypack.dev/octokit";
-  import { createOAuthUserClientAuth } from "https://esm.sh/octokit-auth-oauth-user-client@0.1.5";
+  import { createOAuthUserClientAuth } from "https://esm.sh/octokit-auth-oauth-user-client@0.1.6";
 
   const octokit = new Octokit({
     authStrategy: createOAuthUserClientAuth,
@@ -117,7 +117,7 @@ Or
 ```html
 <script type="module">
   import { Octokit } from "https://cdn.skypack.dev/@octokit/core";
-  import { createOAuthUserClientAuth } from "https://esm.sh/octokit-auth-oauth-user-client@0.1.5";
+  import { createOAuthUserClientAuth } from "https://esm.sh/octokit-auth-oauth-user-client@0.1.6";
 
   const octokit = new Octokit({
     authStrategy: createOAuthUserClientAuth,
